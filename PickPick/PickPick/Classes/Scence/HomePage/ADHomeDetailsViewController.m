@@ -56,15 +56,13 @@
 - (IBAction)playRecording:(UIButton *)sender {
 
     ADLog(@"播放录音");
-    ADLog(@"---接收----%@",self.model.host);
 // 判断是否是当前用户自己点自己的任务,如果不是再继续
     AVUser *user = [AVUser currentUser];
-    ADLog(@"----current user aid ----%@, ---- mission host aid ---%@",user.mobilePhoneNumber,self.model.aid);
     
     if ([user.mobilePhoneNumber isEqualToString:self.model.aid]) {
     
         [SVProgressHUD setBackgroundColor:ADDARK_BLUE_(0.8)];
-        [SVProgressHUD setRingThickness:20];
+        [SVProgressHUD setRingThickness:10];
         [SVProgressHUD setForegroundColor:[UIColor whiteColor]];
         [SVProgressHUD showErrorWithStatus:@"---TEST : 不可以接自己的任务哦---" maskType:4];
         
@@ -137,7 +135,7 @@
     self.scrollView.contentSize = CGSizeMake(30, self.view.frame.size.height + 200);
    [self.navigationController.navigationBar setHidden:NO];
     self.tabBarController.tabBar.hidden = YES;
-    ADLog(@"---view did appear user aid ---%@",self.model.aid);
+
     
 }
 

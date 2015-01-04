@@ -32,7 +32,8 @@
     
     self.window = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
     self.window.backgroundColor = [UIColor whiteColor];
-    
+
+//---------------------------------------------- AVOS -----------------------------------------------------
     // AVOS Config
     [AVOSCloud setApplicationId:APPID clientKey:APPKEY];
     [AVAnalytics trackAppOpenedWithLaunchOptions:launchOptions];
@@ -45,6 +46,14 @@
     // 搜集用户通过通知打开应用的数据
     [self statitsticsOfOpenningAppWhenReceivedNotification:application launchPotions:launchOptions];
     
+    // 当收到"接单"推送的时候
+    // Extract the notification data
+    NSDictionary *notificationPayload = launchOptions[UIApplicationLaunchOptionsRemoteNotificationKey];
+    ADLog(@"---- notificationPayload info ----%@",notificationPayload);
+    // Create a pointer to the Photo object
+
+    
+//---------------------------------------------- EaseMob --------------------------------------------------
     /**
      *  chat
      */
@@ -60,6 +69,7 @@
     
     [self style];
     
+
     
     return YES;
 }
@@ -133,6 +143,11 @@ message:error.description delegate:nil cancelButtonTitle:@"确定" otherButtonTi
     
 }
 
+- (void)application:(UIApplication *)application didReceiveRemoteNotification:(NSDictionary *)userInfo fetchCompletionHandler:(void (^)(UIBackgroundFetchResult))completionHandler {
+    
+    ADLog(@"--- did receive Remote handler %@ -- ",userInfo);
+    
+}
 
 - (void)application:(UIApplication *)application didReceiveLocalNotification:(UILocalNotification *)notification {
     
@@ -187,7 +202,7 @@ message:error.description delegate:nil cancelButtonTitle:@"确定" otherButtonTi
         BOOL noPushPayload = ![launchOptions objectForKey:UIApplicationLaunchOptionsRemoteNotificationKey];
         if (preBackgroundPush || oldPushHandlerOnly || noPushPayload) {
             [AVAnalytics trackAppOpenedWithLaunchOptions:launchOptions];
-            ADLog(@"----- count badge -----");
+
         }
         
     }

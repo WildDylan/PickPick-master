@@ -26,7 +26,6 @@
 @property (nonatomic, strong) UIButton *buttonNavLeft;
 @property (nonatomic, strong) UISegmentedControl *segmentedControl; // segment
 @property (nonatomic, strong) NSMutableArray *arrayBaseData; // base data
-@property (nonatomic, strong) NSMutableArray *arrayAllIDs; // exsit keys
 @property (nonatomic, strong) UITableView *tableView; // basic tableView
 @property (nonatomic, strong) NSString *sortBy;
 @property (nonatomic, strong) CLGeocoder *geocoder;
@@ -43,7 +42,6 @@ static NSString *identifier = @"homePageCell";
     // Do any additional setup after loading the view.
 
     self.arrayBaseData = [NSMutableArray array];
-    self.arrayAllIDs = [NSMutableArray array];
     [self adjustSubviews];
     [self setAVQueryForDownloadData];
     [self initTableView];
@@ -174,9 +172,19 @@ static NSString *identifier = @"homePageCell";
     }
     
 }
+
 - (void)headerRereshing {
     
     AVQuery *query = [AVQuery queryWithClassName:@"Mission"];
+    if ([self.sortBy isEqualToString:@"时间"]) {
+        
+        [query orderByDescending:@"timeStamp"];
+        
+    }else if([self.sortBy isEqualToString:@"酬金"]) {
+        
+        [query orderByDescending:@"reward"];
+        
+    }
     
     [self downloadBaseData:query];
     [self.tableView headerEndRefreshing];
@@ -410,7 +418,7 @@ static NSString *identifier = @"homePageCell";
             @try {
                 ADLog(@"---%ld--",(unsigned long)self.arrayBaseData.count);
                 [self.tableView reloadData];
-                NSIndexPath *indexPath = [NSIndexPath indexPathForRow:1 inSection:self.arrayBaseData.count -1 ];
+                NSIndexPath *indexPath = [NSIndexPath indexPathForRow:0 inSection:self.arrayBaseData.count -1 ];
                 [self.tableView scrollToRowAtIndexPath:indexPath atScrollPosition:(UITableViewScrollPositionTop) animated:YES];
                 [SVProgressHUD dismiss];
             }

@@ -77,6 +77,9 @@
         
         //根据接收者的username获取当前会话的管理者
         _conversation = [[EaseMob sharedInstance].chatManager conversationForChatter:chatter isGroup:_isChatGroup];
+    
+        self.hidesBottomBarWhenPushed = YES;
+    
     }
     
     return self;
@@ -119,6 +122,7 @@
     //通过会话管理者获取已收发消息
     [self loadMoreMessages];
 }
+
 
 - (void)setupBarButtonItem
 {

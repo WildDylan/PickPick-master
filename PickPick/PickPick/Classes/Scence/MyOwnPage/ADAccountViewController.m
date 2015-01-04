@@ -9,9 +9,8 @@
 
 
 #define JUMP_MESSAGE(DES) [NSString stringWithFormat:@"Line: %d, Here For Jump---->%@", __LINE__, DES]
-#define	XLog(format,...) NSLog(@"[%s][%d]" format,__func__,__LINE__,##__VA_ARGS__)
 
-#define KINSET_BASEHEADER 160
+#define KINSET_BASEHEADER 140
 #define KINSET_HEADER_A 80
 #define KINSET_ALERTSIZE 20
 #define KINSET_PADDING 0
@@ -31,8 +30,14 @@ static NSString * const AccountCellIdentifier = @"homePageCell";
 #import "RNBlurModalView.h"
 #import "ADConfirmPageViewController.h"
 #import "SVProgressHUD.h"
+#import "MJRefresh.h"
+
 
 @interface ADAccountViewController () <UITableViewDelegate, UITableViewDataSource,UINavigationControllerDelegate,UIImagePickerControllerDelegate>
+{
+    CGFloat contentOfSetBegin;   // get the content of set of base tableview
+    CGFloat contentOfSetEnd;
+}
 
 // Basic TableView
 @property (nonatomic, strong) UITableView * baseTableView;
@@ -49,6 +54,10 @@ static NSString * const AccountCellIdentifier = @"homePageCell";
 // BaseArray.
 @property (nonatomic, strong) NSMutableArray * baseDataArray;
 
+
+
+
+
 //-------------------------Alert-----------------------------
 @property (nonatomic, strong) RNBlurModalView * alertView;
 @property (nonatomic, strong) UITextField * myNickName;
@@ -60,6 +69,11 @@ static NSString * const AccountCellIdentifier = @"homePageCell";
 @property (nonatomic, strong) NSString *aid;
 
 @property (nonatomic, strong) UIImageView *imageView;
+
+//-------------------------Base data-------------------------
+@property (nonatomic, strong) NSString *fetchWithStatus;
+
+
 
 @end
 
@@ -81,18 +95,21 @@ static NSString * const AccountCellIdentifier = @"homePageCell";
 #pragma mark - view load / appear
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
+    ADLog(@"----will appear ---");
     [self showTabBar];
-    [self downloadBaseData];
     [self downloadUserInfo];
+    
 }
 - (void)viewDidLoad
 {
     [super viewDidLoad];
-    
+    ADLog(@"---- view did load ---");
     [self setRightBarButtonWithString:@"设置"];
-    [self layoutMyViews];
     [self selfStyle];
     [self initData];
+    [self downloadBaseData];
+    [self layoutMyViews];
+    [self setupRefresh];
 }
 
 //-------------------------------------------------------------------------------
@@ -110,6 +127,8 @@ static NSString * const AccountCellIdentifier = @"homePageCell";
     
 }
 
+#pragma mark - init
+
 - (void)layoutMyViews {
     
     
@@ -121,8 +140,35 @@ static NSString * const AccountCellIdentifier = @"homePageCell";
     _baseTableView.dataSource = self;
     _baseTableView.separatorStyle = UITableViewCellSeparatorStyleNone;
     _baseTableView.backgroundColor = ADLIGHT_BLUE;
+    
+    // 个人信息设置到tableview的tableHeaderView中
+    UIView * bgView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, CGRectGetWidth(self.view.frame), KINSET_BASEHEADER)];
+    [bgView setBackgroundColor:ADLIGHT_BLUE];
+    [self layoutAtView:bgView];
+    [self.baseTableView setTableHeaderView:bgView];
+    
     [self.view addSubview:_baseTableView];
     [_baseTableView registerNib:[UINib nibWithNibName:@"ADHomePageTableViewCell" bundle:nil] forCellReuseIdentifier:AccountCellIdentifier];
+    
+    
+    
+    
+}
+
+- (void)setupRefresh {
+    
+    [self.baseTableView addHeaderWithTarget:self action:@selector(headerRereshingAction)];
+    [self.baseTableView headerBeginRefreshing];
+
+    self.baseTableView.headerPullToRefreshText = @"下拉刷新";
+    self.baseTableView.headerReleaseToRefreshText = @"即将开始刷新";
+    self.baseTableView.headerRefreshingText = @"正在刷新";
+    
+    [self.baseTableView addFooterWithTarget:self action:@selector(footerREreshingAction)];
+    self.baseTableView.footerPullToRefreshText = @"上拉加载";
+    self.baseTableView.footerReleaseToRefreshText = @"即将开始加载";
+    self.baseTableView.footerRefreshingText = @"正在加载";
+    
 }
 
 - (void)initData {
@@ -133,11 +179,13 @@ static NSString * const AccountCellIdentifier = @"homePageCell";
     
     [self showProgressHUD];
     AVQuery *query = [[AVQuery alloc] initWithClassName:@"Mission"];
+    self.fetchWithStatus = @"已发布";
     [self downloadBaseDataWithQuery:query];
     
 }
 
 - (void)downloadUserInfo {
+    
     AVUser *user = [AVUser currentUser];
     ADLog(@"----account current user %@---",[user objectForKey:@"nickname"]);
     AVFile *getFile =[user objectForKey:@"imageHeader"];
@@ -146,6 +194,9 @@ static NSString * const AccountCellIdentifier = @"homePageCell";
     self.aid = user.mobilePhoneNumber;
     self.imageHeader = imageHeader;
     self.userName = [user objectForKey:@"nickname"];
+    
+    [self.headerImageButton.imageView setImage:imageHeader];
+    [self.nickNameButton setTitle:self.userName forState:(UIControlStateNormal)];
     
 }
 
@@ -159,48 +210,108 @@ static NSString * const AccountCellIdentifier = @"homePageCell";
 
 - (void)downloadBaseDataWithQuery:(AVQuery *)query {
     
+    ADLog(@"----- down load base data ----- ");
+    query.limit = 4;
+    //    [query orderByDescending:@"timeStamp"];
+    //    query.cachePolicy = kAVCachePolicyCacheThenNetwork;
+    NSMutableArray *array = [NSMutableArray array];
     [query findObjectsInBackgroundWithBlock:^(NSArray *objects, NSError *error) {
-       
+        
         if (error) {
+            ADLog(@"--- error = %@ ---", error);
+            [SVProgressHUD dismiss];
             
-//            ADLog(@"--- error = %@ ---",error);
-//            [self.baseDataArray removeAllObjects];
-//            [self.baseTableView reloadData];
-//            [SVProgressHUD dismiss];
         }else{
-            ADLog(@"---- load data %ld ---",(unsigned long)objects.count);
-            [self.baseDataArray removeAllObjects];
-            if (objects.count) {
-                for (AVObject *objc in objects) {
-                    
-                    ADModelHomePage *model = [[ADModelHomePage alloc] init];
-                    AVObject *obj = [objc objectForKey:@"host"];
-                    AVUser *getUser = (AVUser *)[obj fetchIfNeeded];
-                    [model setValue:getUser forKey:@"host"];
-                    [model setValue:[objc objectForKey:@"aid"] forKey:@"aid"];
-                    [model setValue:[objc objectForKey:@"status"] forKey:@"status"];
-                    [model setValue:[objc objectForKey:@"title"] forKey:@"title"];
-                    [model setValue:[objc objectForKey:@"timeLimit"] forKey:@"timeLimit"];
-                    [model setValue:[objc objectForKey:@"address"] forKey:@"address"];
-                    [model setValue:[objc objectForKey:@"reward"] forKey:@"reward"];
-                    [model setValue:[objc objectForKey:@"content"] forKey:@"content"];
-                    [model setValue:[objc objectForKey:@"latitude"] forKey:@"latitude"];
-                    [model setValue:[objc objectForKey:@"longitude"] forKey:@"longitude"];
-                    [model setValue:[objc objectForKey:@"timeStamp"] forKey:@"timeStamp"];
-                    [self.baseDataArray addObject:model];
-                    
-                }
+            ADLog(@"---------------------- %ld",(unsigned long)objects.count);
+            for (AVObject *objc in objects) {
+                
+                ADModelHomePage *model = [[ADModelHomePage alloc] init];
+                AVObject *obj = [objc objectForKey:@"host"];
+                AVUser *user = (AVUser *)[obj fetchIfNeeded];
+                [model setValue:user forKey:@"host"];
+                [model setValue:[objc objectForKey:@"aid"] forKey:@"aid"];
+                [model setValue:[objc objectForKey:@"title"] forKey:@"title"];
+                [model setValue:[objc objectForKey:@"timeLimit"] forKey:@"timeLimit"];
+                [model setValue:[objc objectForKey:@"address"] forKey:@"address"];
+                [model setValue:[objc objectForKey:@"reward"] forKey:@"reward"];
+                [model setValue:[objc objectForKey:@"content"] forKey:@"content"];
+                [model setValue:[objc objectForKey:@"latitude"] forKey:@"latitude"];
+                [model setValue:[objc objectForKey:@"longitude"] forKey:@"longitude"];
+                [model setValue:[objc objectForKey:@"timeStamp"] forKey:@"timeStamp"];
+                [model setValue:[objc objectForKey:@"status"] forKey:@"status"];
+                [array addObject:model];
                 
             }
-            
+
+            [self.baseDataArray removeAllObjects];
+            [self.baseDataArray setArray:array];
             [self.baseTableView reloadData];
             [SVProgressHUD dismiss];
+            [self.baseTableView setScrollsToTop:YES];
+            
         }
         
     }];
 
 }
 
+
+- (void)downloadDataForFootRefresh:(AVQuery *)query {
+    
+    NSInteger skipNum = self.baseDataArray.count;
+    ADLog(@"---- skipNum %ld ----",(long)skipNum);
+    query.limit = 4;
+    query.skip = skipNum;
+    [query findObjectsInBackgroundWithBlock:^(NSArray *objects, NSError *error) {
+        
+        if (error) {
+            ADLog(@"--- error = %@ ---", error);
+            [SVProgressHUD dismiss];
+            
+        }else{
+            
+            //            [self.arrayBaseData removeAllObjects];
+            for (AVObject *objc in objects) {
+                
+                ADModelHomePage *model = [[ADModelHomePage alloc] init];
+                AVObject *obj = [objc objectForKey:@"host"];
+                AVUser *user = (AVUser *)[obj fetchIfNeeded];
+                
+                [model setValue:user forKey:@"host"];
+                [model setValue:[objc objectForKey:@"aid"] forKey:@"aid"];
+                [model setValue:[objc objectForKey:@"title"] forKey:@"title"];
+                [model setValue:[objc objectForKey:@"timeLimit"] forKey:@"timeLimit"];
+                [model setValue:[objc objectForKey:@"address"] forKey:@"address"];
+                [model setValue:[objc objectForKey:@"reward"] forKey:@"reward"];
+                [model setValue:[objc objectForKey:@"content"] forKey:@"content"];
+                [model setValue:[objc objectForKey:@"latitude"] forKey:@"latitude"];
+                [model setValue:[objc objectForKey:@"longitude"] forKey:@"longitude"];
+                [model setValue:[objc objectForKey:@"timeStamp"] forKey:@"timeStamp"];
+                [model setValue:[objc objectForKey:@"status"] forKey:@"status"];
+                [self.baseDataArray addObject:model];
+                
+            }
+            
+            @try {
+                ADLog(@"---%ld--",(unsigned long)self.baseDataArray.count);
+                [self.baseTableView reloadData];
+                NSIndexPath *indexPath = [NSIndexPath indexPathForRow:self.baseDataArray.count - 1 inSection:0];
+                [self.baseTableView scrollToRowAtIndexPath:indexPath atScrollPosition:(UITableViewScrollPositionTop) animated:YES];
+                [SVProgressHUD dismiss];
+            }
+            @catch (NSException *exception) {
+                ADLog(@"----exception---- %@",exception);
+            }
+            
+            @finally {
+                
+            }
+            
+        }
+        
+    }];
+    
+}
 
 - (void)selfStyle {
     
@@ -227,6 +338,57 @@ static NSString * const AccountCellIdentifier = @"homePageCell";
 
 }
 
+#pragma mark - Action
+- (void)headerRereshingAction {
+    
+    AVQuery *query = [AVQuery queryWithClassName:@"Mission"];
+    [query whereKey:@"aid" equalTo:self.aid];
+    
+    if ([self.fetchWithStatus isEqualToString:@"已发布"]) {
+        
+        [query whereKey:@"status" equalTo:@"已发布"];
+        
+        
+    }else if ([self.fetchWithStatus isEqualToString:@"工作中"]) {
+        
+        [query whereKey:@"status" equalTo:@"工作中"];
+        
+        
+    }else if ([self.fetchWithStatus isEqualToString:@"已完成"]) {
+        
+        [query whereKey:@"status" equalTo:@"已完成"];
+        
+    }
+    
+    [self downloadBaseDataWithQuery:query];
+    [self.baseTableView headerEndRefreshing];
+    
+}
+
+- (void)footerREreshingAction {
+    
+    // 下拉加载,根据标识语句判断,加载新数据
+    AVQuery *query = [AVQuery queryWithClassName:@"Mission"];
+    if ([self.fetchWithStatus isEqualToString:@"已发布"]) {
+        
+        [query whereKey:@"status" equalTo:@"已发布"];
+
+        
+    }else if ([self.fetchWithStatus isEqualToString:@"工作中"]) {
+        
+        [query whereKey:@"status" equalTo:@"工作中"];
+
+        
+    }else if ([self.fetchWithStatus isEqualToString:@"已完成"]) {
+        
+        [query whereKey:@"status" equalTo:@"已完成"];
+
+    }
+    
+    [self downloadDataForFootRefresh:query];
+    [self.baseTableView footerEndRefreshing];
+}
+
 //------------------------------------ Layout -----------------------------------
 //-------------------------------------------------------------------------------
 
@@ -239,7 +401,7 @@ static NSString * const AccountCellIdentifier = @"homePageCell";
     [self.navigationController pushViewController:confirmVC animated:YES];
     
     //TODO: Set. VC
-    XLog(@"%@", JUMP_MESSAGE(@"SettingVC"));
+    ADLog(@"%@", JUMP_MESSAGE(@"SettingVC"));
 }
 
 #pragma mark - tableView delegate Methods
@@ -277,7 +439,6 @@ static NSString * const AccountCellIdentifier = @"homePageCell";
     cell.contentView.backgroundColor = ADLIGHT_BLUE;
     
     if (self.baseDataArray.count) {
-        ADLog(@"-----");
         ADModelHomePage *model = self.baseDataArray[indexPath.row];
         cell.modelAccount = model;
     }
@@ -289,36 +450,37 @@ static NSString * const AccountCellIdentifier = @"homePageCell";
 }
 
 - (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath {
-    return 180;
+    return 170;
 }
 
-- (CGFloat)tableView:(UITableView *)tableView heightForHeaderInSection:(NSInteger)section {
-    return KINSET_BASEHEADER;
-}
+//- (CGFloat)tableView:(UITableView *)tableView heightForHeaderInSection:(NSInteger)section {
+//    return KINSET_BASEHEADER;
+//}
 
 //-----------------------------------------------------------------------------
 //------------------------------------Header-----------------------------------
-- (UIView *)tableView:(UITableView *)tableView viewForHeaderInSection:(NSInteger)section {
-    if (section == 0) {
-        
-        UIView * bgView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, CGRectGetWidth(self.view.frame), KINSET_BASEHEADER)];
-        [bgView setBackgroundColor:ADLIGHT_BLUE];
-        [self layoutAtView:bgView];
-        return bgView;
-    }
-    return nil;
-}
+//- (UIView *)tableView:(UITableView *)tableView viewForHeaderInSection:(NSInteger)section {
+//    if (section == 0) {
+//        
+//        UIView * bgView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, CGRectGetWidth(self.view.frame), KINSET_BASEHEADER)];
+//        [bgView setBackgroundColor:ADLIGHT_BLUE];
+//        [self layoutAtView:bgView];
+//        return bgView;
+//    }
+//    return nil;
+//}
+
+
 
 - (void)layoutAtView: (UIView *)bgView {
     
-    ADLog(@"--------------------------------------------------------------------------------------");
+    ADLog(@"--------------------------------------------------------------------------------------%@",self.userName);
     // Layout Header View
     self.headerImageButton = [[BTRippleButtton alloc] initWithImage:self.imageHeader andFrame:CGRectMake(CGRectGetWidth(self.view.frame) / 2. - KINSET_HEADER_A / 2., KINSET_PADDING, KINSET_HEADER_A, KINSET_HEADER_A) onCompletion:^(BOOL success) {
        
         if (success) {
                 ADLog(@"-----------------------------------------------------------------------------------------");
             //TODO:  首先判断 是否登录/ 如果没有登录->JUMO LOGIN / 如果登录->打开ImagePicker进行头像选取
-            
             
             UIImagePickerController *picker = [[UIImagePickerController alloc] init];
             picker.delegate = self;
@@ -353,6 +515,7 @@ static NSString * const AccountCellIdentifier = @"homePageCell";
     segmentedControl1.layer.cornerRadius = 3;
     [segmentedControl1 addTarget:self action:@selector(segmentedControlChangedValue:) forControlEvents:UIControlEventValueChanged];
     [bgView addSubview:segmentedControl1];
+    
 }
 
 
@@ -363,6 +526,7 @@ static NSString * const AccountCellIdentifier = @"homePageCell";
     UIImage *image = [info valueForKey:UIImagePickerControllerOriginalImage];
     AVUser *user = [AVUser currentUser];
     NSData *imageData;
+    // 图片转data, 判断,
     if (UIImagePNGRepresentation(image) == nil) {
         
         imageData = UIImageJPEGRepresentation(image, 0.5);
@@ -391,9 +555,12 @@ static NSString * const AccountCellIdentifier = @"homePageCell";
         
     }];
     
+    // 设置新更改的头像
+    self.headerImageButton.imageView.image = image;
     [picker dismissViewControllerAnimated:YES completion:nil];
     
 }
+
 
 - (UIImageView *)setPlaceholderPicture {
     
@@ -406,6 +573,7 @@ static NSString * const AccountCellIdentifier = @"homePageCell";
     return _imageView;
 }
 
+
 - (void)segmentedControlChangedValue: (HMSegmentedControl *)segment {
     ADLog(@"%ld", (long)[segment selectedSegmentIndex])
     //TODO:  根据选择不同的index 来让TableView展示不同的数据
@@ -414,7 +582,8 @@ static NSString * const AccountCellIdentifier = @"homePageCell";
         {
         
         // 已发布
-            [self postedMissions];
+            self.fetchWithStatus = @"已发布";
+            [self selectedPostedMissions];
             
         }
             break;
@@ -422,50 +591,61 @@ static NSString * const AccountCellIdentifier = @"homePageCell";
         {
         
         // 工作中
-            [self working];
+            self.fetchWithStatus = @"工作中";
+            [self selectedWorking];
             
         }
             break;
         case 2:
         {
         // 已完成
-            [self finished];
+            self.fetchWithStatus = @"已完成";
+            [self selectedFinished];
         }
             break;
             
         default:
         {
-            XLog(@"segment error!");
+            ADLog(@"segment error!");
         }
             break;
     }
 }
 
-- (void)postedMissions {
-    ADLog(@"---已发布--");
-    AVQuery *query = [AVQuery queryWithClassName:@"Missions"];
+
+- (void)selectedPostedMissions {
+  
+    ADLog(@"--- 已发布 --");
+    AVQuery *query = [AVQuery queryWithClassName:@"Mission"];
     [query whereKey:@"aid" equalTo:self.aid];
-    [query whereKey:@"status" equalTo:@"已发布"];
+    [query addDescendingOrder:@"timeStamp"];
     [self downloadBaseDataWithQuery:query];
     
 }
 
-- (void)working {
-    ADLog(@"---工作中---");
-    AVQuery *query = [AVQuery queryWithClassName:@"Missions"];
+
+- (void)selectedWorking {
+
+    ADLog(@"--- 工作中 ---");
+    AVQuery *query = [AVQuery queryWithClassName:@"Mission"];
     [query whereKey:@"aid" equalTo:self.aid];
     [query whereKey:@"status" equalTo:@"工作中"];
+    [query addAscendingOrder:@"timeStamp"];
     [self downloadBaseDataWithQuery:query];
+
 }
 
-- (void)finished {
-    ADLog(@"---已完成---");
-    AVQuery *query = [AVQuery queryWithClassName:@"Missions"];
+
+- (void)selectedFinished {
+    ADLog(@"--- 已完成 ---");
+    AVQuery *query = [AVQuery queryWithClassName:@"Mission"];
     [query whereKey:@"aid" equalTo:self.aid];
     [query whereKey:@"status" equalTo:@"已完成"];
+    [query addDescendingOrder:@"timeStamp"];
     [self downloadBaseDataWithQuery:query];
     
 }
+
 
 - (void)changeNickName: (UIButton *)button {
     
@@ -473,6 +653,7 @@ static NSString * const AccountCellIdentifier = @"homePageCell";
     [self.alertView show], [_myNickName resignFirstResponder];
     
 }
+
 
 // Lazy Load
 - (RNBlurModalView *)alertView {
@@ -514,6 +695,7 @@ static NSString * const AccountCellIdentifier = @"homePageCell";
     return bgView;
 }
 
+
 - (void)changeNow {
     
     ADLog(@"%@", _myNickName.text);
@@ -526,19 +708,71 @@ static NSString * const AccountCellIdentifier = @"homePageCell";
     
 }
 
+
+#pragma mark - ScrollView delegate
+
+- (void)scrollViewWillBeginDragging:(UIScrollView *)scrollView {
+    
+    contentOfSetBegin = scrollView.contentOffset.y;
+    
+    
+}
+
+
+- (void)scrollViewDidScroll:(UIScrollView *)scrollView {
+    
+    CGFloat contentOfSet = scrollView.contentOffset.y;
+    if (contentOfSetBegin < contentOfSet) {
+        
+        [UIView animateWithDuration:0.8 animations:^{
+            
+            //            [self.navigationController setNavigationBarHidden:YES];
+            [self.tabBarController.tabBar setHidden:YES];
+            
+        }];
+        
+        
+    } else {
+        
+        [UIView animateWithDuration:0.8 animations:^{
+            
+            //            [self.navigationController setNavigationBarHidden:NO];
+            [self.tabBarController.tabBar setHidden:NO];
+            
+        }];
+        
+        
+    }
+    
+    
+}
+
+
+- (void)scrollViewDidEndDecelerating:(UIScrollView *)scrollView {
+    
+    ADLog(@"-----did end decelerating ---- %f",scrollView.contentOffset.y);
+    if (scrollView.contentOffset.y <= 10) {
+        
+        [UIView animateWithDuration:0.8 animations:^{
+            
+            [self.navigationController setNavigationBarHidden:NO];
+            [self.tabBarController.tabBar setHidden:NO];
+            
+        }];
+        
+        
+    }
+    
+}
+
+
+
 - (void)dismissAlertView {
     [self.alertView hide];
     
 }
 //------------------------------------Header-----------------------------------
 //-----------------------------------------------------------------------------
-
-
-
-
-
-
-
 
 
 

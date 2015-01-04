@@ -8,9 +8,13 @@
 
 #import "ADConfirmPageViewController.h"
 #import "ProgressHUD.h"
+#import "SVProgressHUD.h"
+
 static NSString *identifier = @"confirmPageCell";
 
-@interface ADConfirmPageViewController ()<UITableViewDataSource,UITableViewDelegate>
+#define APPID_URL @"http://itunes.apple.com/lookup?id=950296060"
+
+@interface ADConfirmPageViewController ()<UITableViewDataSource,UITableViewDelegate,UIAlertViewDelegate>
 
 @property (nonatomic, strong) UITableView *tabelView;
 @property (nonatomic, strong) NSArray *arrayAboutUser;
@@ -172,6 +176,7 @@ static NSString *identifier = @"confirmPageCell";
         [buttonLogout setTitleColor:ADDARK_BLUE forState:(UIControlStateNormal)];
         [buttonLogout addTarget:self action:@selector(clicklogOut) forControlEvents:(UIControlEventTouchUpInside)];
         return buttonLogout;
+        
     }else {
         return NULL;
     }
@@ -229,6 +234,28 @@ static NSString *identifier = @"confirmPageCell";
 - (void)updateLatestVersion {
     
     // 更新版本
+    NSDictionary *infoDic = [[NSBundle mainBundle] infoDictionary];
+    NSString *currentVersion = [infoDic objectForKey:@"CFBundleVersion"];
+    NSDictionary *dic = [NSDictionary dictionaryWithDictionary:[self POSTGetVersionInfo]];
+    NSArray *arrayInfo = [dic objectForKeyedSubscript:@"results"];
+    if ([arrayInfo count]) {
+        
+        NSDictionary *releaseInfo = arrayInfo[0];
+        NSString *lastVersion = [releaseInfo objectForKey:@"version"];
+        if (![lastVersion isEqualToString:currentVersion]) {
+            
+            UIAlertView *alert = [[UIAlertView alloc] initWithTitle:@"更新" message:@"有新版本,前往更新" delegate:self cancelButtonTitle:@"稍后更新" otherButtonTitles:@"更新", nil];
+            [SVProgressHUD dismiss];
+            [alert show];
+            
+        }
+        else
+        {
+            UIAlertView *alert = [[UIAlertView alloc] initWithTitle:@"更新" message:@"此版本为最新版本" delegate:nil cancelButtonTitle:@"确定" otherButtonTitles:nil, nil];
+            [alert show];
+        }
+        
+    }
     
 }
 
@@ -236,6 +263,7 @@ static NSString *identifier = @"confirmPageCell";
     
     // 清除缓存
     [AVFile clearAllCachedFiles];
+    [self showSVProgressHUD:@"清楚完毕"];
     
 }
 
@@ -278,6 +306,40 @@ static NSString *identifier = @"confirmPageCell";
         _labelContact.alpha = 0;
         
     }];
+   
+    
+}
+
+
+
+
+#pragma mark - POST get version 
+
+- (NSDictionary *)POSTGetVersionInfo {
+    
+    //  CFShow((__bridge CFTypeRef)(infoDic));
+    
+    NSMutableURLRequest *request = [[NSMutableURLRequest alloc] init];
+    [request setURL:[NSURL URLWithString:APPID_URL]];
+    [request setHTTPMethod:@"POST"];
+    NSHTTPURLResponse *urlResponse = nil;
+    NSError *error = nil;
+    NSData *recervedData = [NSURLConnection sendSynchronousRequest:request returningResponse:&urlResponse error:&error];
+    NSDictionary *dic = [NSJSONSerialization JSONObjectWithData:recervedData options:(NSJSONReadingMutableContainers) error:&error];
+//    ADLog(@"---- %@",dic);
+
+    return dic;
+}
+
+- (void)alertView:(UIAlertView *)alertView clickedButtonAtIndex:(NSInteger)buttonIndex {
+  
+    if (buttonIndex == 1) {
+        
+        NSURL *url = [NSURL URLWithString:@"https://itunes.apple.com"];
+        [[UIApplication sharedApplication] openURL:url];
+        
+    }
+    
    
     
 }
@@ -365,6 +427,13 @@ static NSString *identifier = @"confirmPageCell";
     
 }
 
+- (void)showSVProgressHUD:(NSString *)message {
+    
+    [SVProgressHUD setBackgroundColor:ADDARK_BLUE_(0.9)];
+    [SVProgressHUD setForegroundColor:[UIColor whiteColor]];
+    [SVProgressHUD showSuccessWithStatus:message maskType:4];
+    
+}
 
 - (void)didReceiveMemoryWarning {
     [super didReceiveMemoryWarning];

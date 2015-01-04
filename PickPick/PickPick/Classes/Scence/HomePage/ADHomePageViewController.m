@@ -89,6 +89,11 @@ static NSString *identifier = @"homePageCell";
         
     }
     
+    // show segment
+    if (self.segmentedControl.alpha < 1.0f) {
+        ADLog(@"---- segmenetedControl alpha ----");
+        self.segmentedControl.alpha = 1.0f;
+    }
 }
 
 - (void)setAVQueryForDownloadData {
@@ -315,10 +320,13 @@ static NSString *identifier = @"homePageCell";
                 [array addObject:model];
                 
             }
+
             ADLog(@"----原来的 %ld----",(unsigned long)self.arrayBaseData.count);
             [self.arrayBaseData removeAllObjects];
             [self.arrayBaseData setArray:array];
             ADLog(@"--- 重载的array count %ld ----",(unsigned long)self.arrayBaseData.count);
+            ADModelHomePage *model = self.arrayBaseData[0];
+            ADLog(@"---- 首条数据信息 ----%@",[model aid]);
             [self.tableView reloadData];
             [SVProgressHUD dismiss];
             [self.tableView setScrollsToTop:YES];
@@ -564,9 +572,9 @@ static NSString *identifier = @"homePageCell";
         ADHomeDetailsViewController *homeVC = [[ADHomeDetailsViewController alloc] init];
         ADModelHomePage *model = self.arrayBaseData[indexPath.section];
         homeVC.model = model;
-        ADLog(@"--homeVC model %@ model %@--",homeVC.model,model.address);
-      // [self.tabBarController setHidesBottomBarWhenPushed:YES];
-       // [homeVC.tabBarController.tabBar setHidden:YES];
+        ADLog(@"--homeVC model %@ model %@--",homeVC.model.aid,model.aid);
+        [self.tabBarController setHidesBottomBarWhenPushed:YES];
+        self.segmentedControl.alpha =0; // 详情界面隐藏
         [self.navigationController pushViewController:homeVC animated:YES];
 
     }
@@ -589,7 +597,7 @@ static NSString *identifier = @"homePageCell";
       
         [UIView animateWithDuration:0.8 animations:^{
             
-            [self.navigationController setNavigationBarHidden:YES];
+//            [self.navigationController setNavigationBarHidden:YES];
             [self.tabBarController.tabBar setHidden:YES];
             
         }];
@@ -599,7 +607,7 @@ static NSString *identifier = @"homePageCell";
         
         [UIView animateWithDuration:0.8 animations:^{
             
-            [self.navigationController setNavigationBarHidden:NO];
+//            [self.navigationController setNavigationBarHidden:NO];
             [self.tabBarController.tabBar setHidden:NO];
             
         }];
@@ -612,7 +620,8 @@ static NSString *identifier = @"homePageCell";
 
 - (void)scrollViewDidEndDecelerating:(UIScrollView *)scrollView {
     
-    if (scrollView.contentOffset.y < 5) {
+    ADLog(@"-----did end decelerating ---- %f",scrollView.contentOffset.y);
+    if (scrollView.contentOffset.y <= 10) {
         
         [UIView animateWithDuration:0.8 animations:^{
             

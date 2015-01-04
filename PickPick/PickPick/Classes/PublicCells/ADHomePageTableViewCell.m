@@ -102,7 +102,7 @@
     CLLocation *locationOrigion = [DataHandle shareInstance].currentLocation;
     
     CGFloat distance = [locationOrigion distanceFromLocation:locationDestination];
-    ADLog(@"----%f----",distance);
+    ADLog(@"---- %f----",distance);
     if (distance >= 0.0 && distance < 1000.0) {
         
         NSString *lessKm = [NSString stringWithFormat:@"%.2fm",distance];

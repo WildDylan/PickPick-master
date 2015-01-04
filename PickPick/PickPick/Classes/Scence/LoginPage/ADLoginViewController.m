@@ -210,6 +210,9 @@
             
         if (!error) {
             ADLog(@"-------------avuser login with phonenumber succeed--------------");
+            EMError *error = nil;
+            [[EaseMob sharedInstance].chatManager logoffWithError:&error];
+            ADLog(@"-------------error----------%@",error);
             [self loginInBackgroundInEaseMob];
             
         }else{

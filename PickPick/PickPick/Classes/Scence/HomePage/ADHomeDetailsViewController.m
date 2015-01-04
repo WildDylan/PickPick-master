@@ -9,7 +9,7 @@
 #import "ADHomeDetailsViewController.h"
 #import "ChatListViewController.h"
 #import "ChatViewController.h"
-
+#import "SVProgressHUD.h"
 @interface ADHomeDetailsViewController ()
 {
     UINavigationController *chatNC;
@@ -57,18 +57,60 @@
 
     ADLog(@"播放录音");
     ADLog(@"---接收----%@",self.model.host);
+// 判断是否是当前用户自己点自己的任务,如果不是再继续
+    AVUser *user = [AVUser currentUser];
+    ADLog(@"----current user aid ----%@, ---- mission host aid ---%@",user.mobilePhoneNumber,self.model.aid);
     
-
-    //---------------------------------------------------- 接收任务
+    if ([user.mobilePhoneNumber isEqualToString:self.model.aid]) {
+    
+        [SVProgressHUD setBackgroundColor:ADDARK_BLUE_(0.8)];
+        [SVProgressHUD setRingThickness:20];
+        [SVProgressHUD setForegroundColor:[UIColor whiteColor]];
+        [SVProgressHUD showErrorWithStatus:@"---TEST : 不可以接自己的任务哦---" maskType:4];
+        
+    }
+    
+    
+    //---------------------------------------------------- 接 收 任 务 ----------------------------------------------
+    AVQuery *query = [AVQuery queryWithClassName:@"Mission"];
+    [query whereKey:@"aid" equalTo:self.model.aid];
+    [query findObjectsInBackgroundWithBlock:^(NSArray *objects, NSError *error) {
+        
+        if (error) {
+            
+            ADLog(@"----error = %@----",error);
+        }else{
+        
+            AVObject *obj = objects.lastObject;
+            [obj setObject:user.mobilePhoneNumber forKey:@"executant"];
+            [obj setObject:@"工作中" forKey:@"status"];
+            [obj saveInBackgroundWithBlock:^(BOOL succeeded, NSError *error) {
+                
+                
+                if (error) {
+                    ADLog(@"---- save error --- %@ ",error);
+                }
+                
+            }];
+        }
+        
+    }];
     
     AVQuery *pushQuery = [AVInstallation query];
     [pushQuery whereKey:@"owner" equalTo:self.model.host];
-
+    
     // send push notification to query
     AVPush *push = [[AVPush alloc] init];
     [push setQuery:pushQuery];
     [push setMessage:[NSString stringWithFormat:@"' %@ '接受了你的任务",[self.model.host objectForKey:@"nickname"]]];
-    [push sendPushInBackground];
+  //  [push sendPushInBackground];
+    [push sendPushInBackgroundWithBlock:^(BOOL succeeded, NSError *error) {
+        
+        if (error) {
+            ADLog(@"--- error ---- %@",error);
+        }
+        
+    }];
     
 }
 
@@ -95,7 +137,7 @@
     self.scrollView.contentSize = CGSizeMake(30, self.view.frame.size.height + 200);
    [self.navigationController.navigationBar setHidden:NO];
     self.tabBarController.tabBar.hidden = YES;
-
+    ADLog(@"---view did appear user aid ---%@",self.model.aid);
     
 }
 
@@ -104,7 +146,7 @@
     [self setHideTabBarAndShowNavigationBar];
     
     [self setValueForSubViews];
-    
+    ADLog(@"-----view will appear----");
 }
 
 - (void)setHideTabBarAndShowNavigationBar {
@@ -113,7 +155,6 @@
         
         [self.tabBarController.tabBar setHidden:YES];
         
-        ADLog(@"----%@----",@"没有隐藏");
     }
     
     if (self.navigationController.navigationBar.hidden) {

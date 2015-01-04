@@ -116,6 +116,9 @@
                 if (!error) {
                     
                     ADLog(@"----login with mobile phont AVUser login succeed info ");
+                    EMError *error = nil;
+                    [[EaseMob sharedInstance].chatManager logoffWithError:&error];
+                    ADLog(@"-------------error----------%@",error);
                     [self loginInBackgroundInEaseMob];
                     
                 }else{
